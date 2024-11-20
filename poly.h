@@ -2,6 +2,7 @@
 #define POLY_H
 
 #include <vector>
+#include <map>
 #include <utility>
 #include <cstddef>
 
@@ -10,6 +11,8 @@ using coeff = int;
 
 class polynomial
 {
+private:
+    std::map<power, coeff> terms; 
 
 public:
     /**
@@ -76,7 +79,16 @@ public:
      * Modulo (%) should support
      * 1. polynomial % polynomial
      */
-    
+    polynomial operator+(const polynomial &other) ; // polynomial + polynomial
+    polynomial operator+(int scalar) ;           // polynomial + int
+    friend polynomial operator+(int scalar, const polynomial &poly); // int + polynomial
+
+
+    polynomial operator*(const polynomial &other);
+    polynomial operator*(int scalar);
+    friend polynomial operator*(int scalar, const polynomial &poly);
+
+    polynomial operator%(const polynomial &divisor) const;
 
     /**
      * @brief Returns the degree of the polynomial
@@ -107,6 +119,7 @@ public:
      *  A vector of pairs representing the canonical form of the polynomial
      */
     std::vector<std::pair<power, coeff>> canonical_form() const;
+    void simplify();
 };
 
 #endif
