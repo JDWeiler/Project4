@@ -1,14 +1,15 @@
 #include "poly.h"
+using namespace std;
 
 polynomial::polynomial() {
-    terms[0] = 0; 
+    terms.insert(pair<int, int>(0, 0));
 }
 
 template <typename Iter>
 polynomial::polynomial(Iter begin, Iter end) {
     for (auto it = begin; it != end; ++it) {
         if (it->second != 0) { 
-            terms[it->first] += it->second; 
+            terms.insert(pair<int, int>(it.first, it.second));
         }
     }
     simplify(); 
@@ -17,8 +18,7 @@ polynomial::polynomial(Iter begin, Iter end) {
 polynomial::polynomial(const polynomial &other) : terms(other.terms) {}
 
 polynomial &polynomial::operator=(const polynomial &other) {
-    if (this != &other) { 
-        
+    if (this != &other) {         
         terms = other.terms; 
     }
     return *this; 
@@ -26,22 +26,66 @@ polynomial &polynomial::operator=(const polynomial &other) {
 
 polynomial polynomial::operator+(const polynomial &other)  {
     polynomial result = *this; 
-    for (const auto &term : other.terms) {
-        result.terms[term.first] += term.second; 
+
+    for (const auto & [power, coeff] : other.terms) {
+        auto currValues = result.terms.find(power);
+
+        if(terms.count(power)) {
+            // term already exists in *this
+            terms[power] += coeff;
+
+            if(terms[power] == 0) {
+                terms.erase(power);
+            }
+        } else {
+            terms[power] = coeff; // new term 
+        }
     }
+
     result.simplify(); 
     return result;
 }
 
 polynomial polynomial::operator+(int scalar)  {
     polynomial result = *this; 
-    result.terms[0] += scalar; 
+
+    if (scalar == 0) {
+        return result;
+    }
+
+    if(terms.count(0)) {
+        terms[0] += scalar;
+
+        if(terms[0] == 0) {
+            terms.erase(0);
+        }
+    } else {
+        terms[0] = scalar;
+    }
+
     result.simplify(); 
     return result;
 }
 
 polynomial operator+(int scalar, const polynomial &poly) {
-    return poly + scalar; 
+    polynomial result = poly;
+    
+    if(scalar == 0) {
+        return result;
+    } 
+
+    if(result.terms.count(0)) {
+        result.terms[0] += scalar;
+
+        if(result.terms[0] == 0) {
+            result.terms.erase(0);
+        }
+    } else {
+        result.terms[0] = scalar;
+    }
+
+    result.simplify();
+    return result;
 }
 
 polynomial polynomial::operator*(const polynomial &other)  {
@@ -58,7 +102,6 @@ polynomial polynomial::operator*(const polynomial &other)  {
     result.simplify(); // Ensure canonical form
     return result;
 }
-
 
 polynomial polynomial::operator*(int scalar) {
     polynomial result = *this;
@@ -94,6 +137,10 @@ std::vector<std::pair<power, coeff>> polynomial::canonical_form() const {
         result.emplace_back(0, 0);
     }
     return result;
+}
+
+bool comparePoly(std::pair<power, coeff> pair1, std::pair<power, coeff> pair2) {
+    return(pair1.first < pair2.first);
 }
 
 void polynomial::simplify() {

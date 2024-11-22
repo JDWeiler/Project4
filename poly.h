@@ -12,7 +12,8 @@ using coeff = int;
 class polynomial
 {
 private:
-    std::map<power, coeff> terms; 
+    // power, coeff
+    std::map<int, int> terms;
 
 public:
     /**
