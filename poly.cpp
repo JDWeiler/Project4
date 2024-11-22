@@ -18,6 +18,7 @@ polynomial::polynomial(const polynomial &other) : terms(other.terms) {}
 
 polynomial &polynomial::operator=(const polynomial &other) {
     if (this != &other) { 
+        
         terms = other.terms; 
     }
     return *this; 
