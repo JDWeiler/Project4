@@ -32,9 +32,17 @@ public:
      * @param end
      *  The end of the container to copy elements from
      */
-    template <typename Iter>
-    polynomial(Iter begin, Iter end);
+    //template <typename Iter>
+    //polynomial(Iter begin, Iter end);
 
+    template <typename Iter>
+    polynomial(Iter begin, Iter end) {
+        for (auto it = begin; it != end; ++it) {
+            terms[it->first] += it->second; // Add term to the map
+        }
+        simplify(); // Ensure canonical form
+    }
+    
     /**
      * @brief Construct a new polynomial object from an existing polynomial object
      *

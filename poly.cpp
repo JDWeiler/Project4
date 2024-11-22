@@ -5,15 +5,6 @@ polynomial::polynomial() {
     terms.insert(pair<int, int>(0, 0));
 }
 
-template <typename Iter>
-polynomial::polynomial(Iter begin, Iter end) {
-    for (auto it = begin; it != end; ++it) {
-        if (it->second != 0) { 
-            terms.insert(pair<int, int>(it.first, it.second));
-        }
-    }
-    simplify(); 
-}
 
 polynomial::polynomial(const polynomial &other) : terms(other.terms) {}
 
