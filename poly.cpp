@@ -24,43 +24,46 @@ polynomial &polynomial::operator=(const polynomial &other) {
     return *this; 
 }
 
-polynomial polynomial::operator+(const polynomial &other)  {
-    polynomial result = *this; 
 
-    for (const auto & [power, coeff] : other.terms) {
-        auto currValues = result.terms.find(power);
+polynomial polynomial::operator+(const polynomial &other) const {
+    polynomial result = *this;
 
-        if(terms.count(power)) {
-            // term already exists in *this
-            terms[power] += coeff;
+    for (const auto &[power, coeff] : other.terms) {
+        auto it = result.terms.find(power);
 
-            if(terms[power] == 0) {
-                terms.erase(power);
+        if (it != result.terms.end()) {
+            // Term exists in result
+            it->second += coeff;
+
+            // Remove term if coefficient becomes 0
+            if (it->second == 0) {
+                result.terms.erase(it);
             }
         } else {
-            terms[power] = coeff; // new term 
+            // Add new term
+            result.terms[power] = coeff;
         }
     }
 
-    result.simplify(); 
+    result.simplify();
     return result;
 }
 
-polynomial polynomial::operator+(int scalar)  {
+polynomial polynomial::operator+(int scalar) const {
     polynomial result = *this; 
 
     if (scalar == 0) {
         return result;
     }
 
-    if(terms.count(0)) {
-        terms[0] += scalar;
+    if(result.terms.count(0)) {
+        result.terms[0] += scalar;
 
-        if(terms[0] == 0) {
-            terms.erase(0);
+        if(result.terms[0] == 0) {
+            result.terms.erase(0);
         }
     } else {
-        terms[0] = scalar;
+        result.terms[0] = scalar;
     }
 
     result.simplify(); 
@@ -88,7 +91,7 @@ polynomial operator+(int scalar, const polynomial &poly) {
     return result;
 }
 
-polynomial polynomial::operator*(const polynomial &other)  {
+polynomial polynomial::operator*(const polynomial &other) const {
     polynomial result;
 
     for (const auto &val : terms) {
@@ -103,8 +106,12 @@ polynomial polynomial::operator*(const polynomial &other)  {
     return result;
 }
 
-polynomial polynomial::operator*(int scalar) {
+polynomial polynomial::operator*(int scalar) const {
     polynomial result = *this;
+
+    if (scalar == 1){
+        return *this;
+    }
 
     for (auto &term : result.terms) {
         term.second *= scalar; 
@@ -115,12 +122,23 @@ polynomial polynomial::operator*(int scalar) {
 }
 
 polynomial operator*(int scalar, const polynomial &poly) {
-    return poly * scalar; 
+     if (scalar == 1) {
+        return poly; 
+    }
+
+    polynomial result = poly;
+
+    for (auto &term : result.terms) {
+        term.second *= scalar; 
+    }
+
+    result.simplify(); 
+    return result;
 }
 
-size_t polynomial::find_degree_of() {
+size_t polynomial::find_degree_of() const {
     if (terms.empty()) {
-        return 0; 
+        return 0; //should it be 0?
     }
     return terms.rbegin()->first; 
 }
@@ -132,7 +150,7 @@ std::vector<std::pair<power, coeff>> polynomial::canonical_form() const {
             result.emplace_back(term.first, term.second); //emplace is like push back but like constrcuts it in place 
         }
     }
-    sort(result.rbegin(), result.rend());
+
     if (result.empty()) {
         result.emplace_back(0, 0);
     }
@@ -156,19 +174,40 @@ void polynomial::simplify() {
     }
 }
 
-polynomial polynomial::operator%(const polynomial &divisor) const {
-    if (divisor.terms.empty() || divisor.terms.rbegin()->second == 0) {
-        throw std::invalid_argument("Division by zero polynomial");
+polynomial polynomial::operator-(const polynomial &other) const {
+    polynomial result = *this; 
+
+    for (const auto &[power, coeff] : other.terms) {
+        result.terms[power] -= coeff;
+
+        if (result.terms[power] == 0) {
+            result.terms.erase(power);
+        }
     }
 
-    polynomial remainder = *this;
+    return result;
+}
 
-    while (remainder.find_degree_of() >= divisor.find_degree_of()) {
-        power degree_diff = remainder.find_degree_of() - divisor.find_degree_of();
-        coeff coeff_ratio = remainder.terms.rbegin()->second / divisor.terms.rbegin()->second;
+polynomial polynomial::operator%(const polynomial &divisor) const {
+     if (divisor.terms.empty()) {
+        polynomial x;
+        x.terms[0] = 0;
+        return x;
+    }
 
-        polynomial term({{degree_diff, coeff_ratio}});
+    polynomial remainder = *this; 
+    polynomial quotient;
+
+    while (!remainder.terms.empty() && remainder.find_degree_of() >= divisor.find_degree_of()) {
+        
+        power degree = remainder.find_degree_of() - divisor.find_degree_of();
+        coeff leading = remainder.terms.rbegin()->second / divisor.terms.rbegin()->second;
+
+        polynomial term;
+        term.terms[degree] = leading; // term = (lead)x^(degree)
+
         remainder = remainder - (term * divisor);
+        remainder.simplify();
     }
 
     return remainder;

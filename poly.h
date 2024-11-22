@@ -80,16 +80,20 @@ public:
      * Modulo (%) should support
      * 1. polynomial % polynomial
      */
-    polynomial operator+(const polynomial &other) ; // polynomial + polynomial
-    polynomial operator+(int scalar) ;           // polynomial + int
-    friend polynomial operator+(int scalar, const polynomial &poly); // int + polynomial
+    polynomial operator+(const polynomial &other) const; // polynomial + polynomial
+    polynomial operator+(int scalar) const ;           // polynomial + int
+    // int + polynomial
 
-
-    polynomial operator*(const polynomial &other);
-    polynomial operator*(int scalar);
+    friend polynomial operator+(int scalar, const polynomial &poly);
     friend polynomial operator*(int scalar, const polynomial &poly);
 
+    polynomial operator*(const polynomial &other) const;
+    polynomial operator*(int scalar) const ;
+   
+
     polynomial operator%(const polynomial &divisor) const;
+
+    polynomial operator-(const polynomial &other) const;
 
     /**
      * @brief Returns the degree of the polynomial
@@ -97,7 +101,7 @@ public:
      * @return size_t
      *  The degree of the polynomial
      */
-    size_t find_degree_of();
+    size_t find_degree_of() const;
 
     /**
      * @brief Returns a vector that contains the polynomial is canonical form. This
@@ -121,6 +125,9 @@ public:
      */
     std::vector<std::pair<power, coeff>> canonical_form() const;
     void simplify();
+    
 };
+
+
 
 #endif
