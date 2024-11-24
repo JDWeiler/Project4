@@ -1,3 +1,6 @@
+#include <thread>
+#include <mutex>
+#include <vector>
 #include "poly.h"
 using namespace std;
 
@@ -82,18 +85,100 @@ polynomial operator+(int scalar, const polynomial &poly) {
     return result;
 }
 
+// polynomial polynomial::operator*(const polynomial &other) const {
+//     polynomial result;
+
+//     for (const auto &val : terms) {
+//         for (const auto &num : other.terms) {
+//             power new_power = val.first + num.first;  
+//             coeff new_coeff = val.second * num.second; 
+//             result.terms[new_power] += new_coeff; 
+//         }
+//     }
+
+//     result.simplify(); // Ensure canonical form
+//     return result;
+// }
+
+
+
+//first thoughts 
 polynomial polynomial::operator*(const polynomial &other) const {
     polynomial result;
+    vector<thread> threads;
 
-    for (const auto &val : terms) {
-        for (const auto &num : other.terms) {
-            power new_power = val.first + num.first;  
-            coeff new_coeff = val.second * num.second; 
-            result.terms[new_power] += new_coeff; 
+    // Each thread will handle one term from 'this'
+    for (const auto &term : terms) {
+        threads.emplace_back([&, term]() {
+            polynomial local_result;
+            for (const auto &other_term : other.terms) {
+                power pow = term.first + other_term.first;
+                coeff cf = term.second * other_term.second;
+                local_result.terms[pow] += cf;
+            }
+            mx.lock();
+            for (const auto &[power, coeff] : local_result.terms) {
+                result.terms[power] += coeff;
+            }
+            mx.unlock();
+        });
+    }
+
+    // Join all threads
+    for (auto &t : threads) {
+        if (t.joinable()) {
+            t.join();
         }
     }
 
-    result.simplify(); // Ensure canonical form
+    result.simplify();
+    return result;
+}
+
+std::mutex mx;
+
+polynomial polynomial::operator*(const polynomial &other) const {
+    polynomial result;
+
+    size_t num_threads = std::thread::hardware_concurrency();
+    if (num_threads == 0) {
+        num_threads = 4;
+    }
+
+    auto multiply_chunk = [&](auto start, auto end) { //lambdaaaa
+        polynomial local;
+        for (auto it = start; it != end; ++it) {
+            for (const auto &num : other.terms) {
+                power pow = it->first + num.first;
+                coeff cf = it->second * num.second;
+                local.terms[pow] += cf;
+            }
+        }
+        mx.lock();
+        for (const auto &[power, coeff] : local.terms) {
+            result.terms[power] += coeff;
+        }
+        mx.unlock();
+    };
+
+    auto it = terms.begin();
+    size_t total_terms = terms.size();
+    size_t chunk_size = (total_terms + num_threads - 1) / num_threads;
+
+    vector<thread> threads;
+    for (size_t i = 0; i < num_threads && it != terms.end(); ++i) {
+        auto start = it;
+        advance(it, chunk_size);
+        threads.emplace_back(multiply_chunk, start, it);
+    }
+
+    for (auto &t : threads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+
+    result.simplify();
     return result;
 }
 
@@ -127,6 +212,99 @@ polynomial operator*(int scalar, const polynomial &poly) {
     return result;
 }
 
+
+#include <thread>
+#include <vector>
+
+polynomial polynomial::operator*(int scalar) const {
+    if (scalar == 1) {
+        return *this;
+    }
+
+    polynomial result = *this;
+
+    if (result.terms.size() > 100) {
+        size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), result.terms.size());
+        if (num_threads == 0) num_threads = 1;
+
+        size_t chunk_size = (result.terms.size() + num_threads - 1) / num_threads;
+        std::vector<std::thread> threads;
+
+        auto it = result.terms.begin();
+        for (size_t i = 0; i < num_threads; ++i) {
+            auto start = it;
+            for (size_t j = 0; j < chunk_size && it != result.terms.end(); ++j) {
+                ++it;
+            }
+            auto end = it;
+
+            threads.emplace_back([start, end, scalar]() {
+                for (auto it = start; it != end; ++it) {
+                    it->second *= scalar;
+                }
+            });
+        }
+
+        for (auto &t : threads) {
+            if (t.joinable()) {
+                t.join();
+            }
+        }
+    } else {
+        for (auto &term : result.terms) {
+            term.second *= scalar;
+        }
+    }
+
+    result.simplify();
+    return result;
+}
+
+polynomial operator*(int scalar, const polynomial &poly) {
+    if (scalar == 1) {
+        return poly;
+    }
+
+    polynomial result = poly;
+
+    if (result.terms.size() > 100) {
+        size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), result.terms.size());
+        if (num_threads == 0) num_threads = 1;
+
+        size_t chunk_size = (result.terms.size() + num_threads - 1) / num_threads;
+        std::vector<std::thread> threads;
+
+        auto it = result.terms.begin();
+        for (size_t i = 0; i < num_threads; ++i) {
+            auto start = it;
+            for (size_t j = 0; j < chunk_size && it != result.terms.end(); ++j) {
+                ++it;
+            }
+            auto end = it;
+
+            threads.emplace_back([start, end, scalar]() {
+                for (auto it = start; it != end; ++it) {
+                    it->second *= scalar;
+                }
+            });
+        }
+
+        for (auto &t : threads) {
+            if (t.joinable()) {
+                t.join();
+            }
+        }
+    } else {
+        for (auto &term : result.terms) {
+            term.second *= scalar;
+        }
+    }
+
+    result.simplify();
+    return result;
+}
+
+
 size_t polynomial::find_degree_of() const {
     if (terms.empty()) {
         return 0; //should it be 0?
@@ -136,9 +314,9 @@ size_t polynomial::find_degree_of() const {
 
 std::vector<std::pair<power, coeff>> polynomial::canonical_form() const {
     std::vector<std::pair<power, coeff>> result;
-    for (auto &term : terms) {
-        if (term.second != 0) {
-            result.emplace_back(term.first, term.second); //emplace is like push back but like constrcuts it in place 
+    for (auto it = terms.rbegin(); it != terms.rend(); ++it) {
+        if (it -> second != 0) {
+            result.emplace_back( it -> first, it -> second); //emplace is like push back but like constrcuts it in place 
         }
     }
 
@@ -162,6 +340,63 @@ void polynomial::simplify() {
     }
     if (terms.empty()) {
         terms[0] = 0; 
+    }
+}
+
+
+void polynomial::simplify() {
+    size_t num_terms = terms.size();
+    if (num_terms <= 100) { // Single-threaded small polynomials
+        for (auto it = terms.begin(); it != terms.end();) { // same thing as other one we made earlier
+            if (it->second == 0) {
+                it = terms.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    } else { // Multithreaded  large polynomials
+        size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), num_terms);
+        if (num_threads == 0) num_threads = 1; //need at least 1 thread
+
+        size_t chunk_size = (num_terms + num_threads - 1) / num_threads; // divides into even chunks//rounds up so nun left out 
+        
+        
+        std::vector<std::map<power, coeff>> local_results(num_threads); //stores thread results
+        std::vector<std::thread> threads; // stores threads
+
+        auto it = terms.begin();
+        for (size_t i = 0; i < num_threads; ++i) {
+            auto start = it;
+            for (size_t j = 0; j < chunk_size && it != terms.end(); ++j) {
+                ++it;
+            }
+            auto end = it;  //finds end of chunk for thread
+
+            threads.emplace_back([&, i, start, end]() { // new thread and process chunk
+                for (auto it = start; it != end; ++it) { // lambda iterates over uhnk if coeff not 0 stores in local results
+                    if (it->second != 0) {
+                        local_results[i][it->first] = it->second;
+                    }
+                }
+            });
+        }
+
+        for (auto &t : threads) {
+            if (t.joinable()) {
+                t.join();
+            }
+        }
+
+        terms.clear();
+        for (const auto &local_result : local_results) {
+            for (const auto &[power, coeff] : local_result) {
+                terms[power] = coeff;
+            }
+        }
+
+        if (terms.empty()) {
+            terms[0] = 0;
+        }
     }
 }
 
