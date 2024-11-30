@@ -109,6 +109,7 @@ polynomial operator+(int scalar, const polynomial &poly) {
 polynomial polynomial::operator*(const polynomial &other) const {
     polynomial result;
     vector<thread> threads;
+    std::mutex mx;
 
     // Each thread will handle one term from 'this'
     for (const auto &term : terms) {
@@ -400,6 +401,20 @@ void polynomial::simplify() {
             terms[0] = 0;
         }
     }
+}
+
+polynomial polynomial::operator-(const polynomial &other) const {
+    polynomial result = *this; 
+
+    for (const auto &[power, coeff] : other.terms) {
+        result.terms[power] -= coeff;
+
+        if (result.terms[power] == 0) {
+            result.terms.erase(power);
+        }
+    }
+
+    return result;
 }
 
 polynomial polynomial::operator%(const polynomial &divisor) const {
