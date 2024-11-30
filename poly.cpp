@@ -2,6 +2,7 @@
 #include <mutex>
 #include <vector>
 #include "poly.h"
+
 using namespace std;
 
 polynomial::polynomial() {
@@ -18,7 +19,7 @@ polynomial &polynomial::operator=(const polynomial &other) {
     return *this; 
 }
 
-
+//poly + poly
 polynomial polynomial::operator+(const polynomial &other) const {
     polynomial result = *this;
 
@@ -43,6 +44,7 @@ polynomial polynomial::operator+(const polynomial &other) const {
     return result;
 }
 
+//poly + scalar
 polynomial polynomial::operator+(int scalar) const {
     polynomial result = *this; 
 
@@ -64,6 +66,7 @@ polynomial polynomial::operator+(int scalar) const {
     return result;
 }
 
+//scalar + poly
 polynomial operator+(int scalar, const polynomial &poly) {
     polynomial result = poly;
     
@@ -85,6 +88,7 @@ polynomial operator+(int scalar, const polynomial &poly) {
     return result;
 }
 
+// poly * poly without threads
 // polynomial polynomial::operator*(const polynomial &other) const {
 //     polynomial result;
 
@@ -100,9 +104,8 @@ polynomial operator+(int scalar, const polynomial &poly) {
 //     return result;
 // }
 
-
-
 //first thoughts 
+//poly * poly using threads
 polynomial polynomial::operator*(const polynomial &other) const {
     polynomial result;
     vector<thread> threads;
@@ -137,85 +140,85 @@ polynomial polynomial::operator*(const polynomial &other) const {
 
 std::mutex mx;
 
-polynomial polynomial::operator*(const polynomial &other) const {
-    polynomial result;
+//poly * poly with threads
+// polynomial polynomial::operator*(const polynomial &other) const {
+//     polynomial result;
 
-    size_t num_threads = std::thread::hardware_concurrency();
-    if (num_threads == 0) {
-        num_threads = 4;
-    }
+//     size_t num_threads = std::thread::hardware_concurrency();
+//     if (num_threads == 0) {
+//         num_threads = 4;
+//     }
 
-    auto multiply_chunk = [&](auto start, auto end) { //lambdaaaa
-        polynomial local;
-        for (auto it = start; it != end; ++it) {
-            for (const auto &num : other.terms) {
-                power pow = it->first + num.first;
-                coeff cf = it->second * num.second;
-                local.terms[pow] += cf;
-            }
-        }
-        mx.lock();
-        for (const auto &[power, coeff] : local.terms) {
-            result.terms[power] += coeff;
-        }
-        mx.unlock();
-    };
+//     auto multiply_chunk = [&](auto start, auto end) { //lambdaaaa
+//         polynomial local;
+//         for (auto it = start; it != end; ++it) {
+//             for (const auto &num : other.terms) {
+//                 power pow = it->first + num.first;
+//                 coeff cf = it->second * num.second;
+//                 local.terms[pow] += cf;
+//             }
+//         }
+//         mx.lock();
+//         for (const auto &[power, coeff] : local.terms) {
+//             result.terms[power] += coeff;
+//         }
+//         mx.unlock();
+//     };
 
-    auto it = terms.begin();
-    size_t total_terms = terms.size();
-    size_t chunk_size = (total_terms + num_threads - 1) / num_threads;
+//     auto it = terms.begin();
+//     size_t total_terms = terms.size();
+//     size_t chunk_size = (total_terms + num_threads - 1) / num_threads;
 
-    vector<thread> threads;
-    for (size_t i = 0; i < num_threads && it != terms.end(); ++i) {
-        auto start = it;
-        advance(it, chunk_size);
-        threads.emplace_back(multiply_chunk, start, it);
-    }
+//     vector<thread> threads;
+//     for (size_t i = 0; i < num_threads && it != terms.end(); ++i) {
+//         auto start = it;
+//         advance(it, chunk_size);
+//         threads.emplace_back(multiply_chunk, start, it);
+//     }
 
-    for (auto &t : threads) {
-        if (t.joinable()) {
-            t.join();
-        }
-    }
+//     for (auto &t : threads) {
+//         if (t.joinable()) {
+//             t.join();
+//         }
+//     }
 
-    result.simplify();
-    return result;
-}
+//     result.simplify();
+//     return result;
+// }
 
-polynomial polynomial::operator*(int scalar) const {
-    polynomial result = *this;
+//poly * scalar no threads
+// polynomial polynomial::operator*(int scalar) const {
+//     polynomial result = *this;
 
-    if (scalar == 1){
-        return *this;
-    }
+//     if (scalar == 1){
+//         return *this;
+//     }
 
-    for (auto &term : result.terms) {
-        term.second *= scalar; 
-    }
+//     for (auto &term : result.terms) {
+//         term.second *= scalar; 
+//     }
 
-    result.simplify(); 
-    return result;
-}
+//     result.simplify(); 
+//     return result;
+// }
 
-polynomial operator*(int scalar, const polynomial &poly) {
-     if (scalar == 1) {
-        return poly; 
-    }
+//scalar * poly without threads
+// polynomial operator*(int scalar, const polynomial &poly) {
+//      if (scalar == 1) {
+//         return poly; 
+//     }
 
-    polynomial result = poly;
+//     polynomial result = poly;
 
-    for (auto &term : result.terms) {
-        term.second *= scalar; 
-    }
+//     for (auto &term : result.terms) {
+//         term.second *= scalar; 
+//     }
 
-    result.simplify(); 
-    return result;
-}
+//     result.simplify(); 
+//     return result;
+// }
 
-
-#include <thread>
-#include <vector>
-
+//poly * scalar with threads
 polynomial polynomial::operator*(int scalar) const {
     if (scalar == 1) {
         return *this;
@@ -260,6 +263,7 @@ polynomial polynomial::operator*(int scalar) const {
     return result;
 }
 
+//scalar * poly with threads
 polynomial operator*(int scalar, const polynomial &poly) {
     if (scalar == 1) {
         return poly;
@@ -304,7 +308,6 @@ polynomial operator*(int scalar, const polynomial &poly) {
     return result;
 }
 
-
 size_t polynomial::find_degree_of() const {
     if (terms.empty()) {
         return 0; //should it be 0?
@@ -330,19 +333,18 @@ bool comparePoly(std::pair<power, coeff> pair1, std::pair<power, coeff> pair2) {
     return(pair1.first < pair2.first);
 }
 
-void polynomial::simplify() {
-    for (auto it = terms.begin(); it != terms.end();) {
-        if (it->second == 0) {
-            it = terms.erase(it); 
-        } else {
-            ++it;
-        }
-    }
-    if (terms.empty()) {
-        terms[0] = 0; 
-    }
-}
-
+// void polynomial::simplify() {
+//     for (auto it = terms.begin(); it != terms.end();) {
+//         if (it->second == 0) {
+//             it = terms.erase(it); 
+//         } else {
+//             ++it;
+//         }
+//     }
+//     if (terms.empty()) {
+//         terms[0] = 0; 
+//     }
+// }
 
 void polynomial::simplify() {
     size_t num_terms = terms.size();
@@ -398,20 +400,6 @@ void polynomial::simplify() {
             terms[0] = 0;
         }
     }
-}
-
-polynomial polynomial::operator-(const polynomial &other) const {
-    polynomial result = *this; 
-
-    for (const auto &[power, coeff] : other.terms) {
-        result.terms[power] -= coeff;
-
-        if (result.terms[power] == 0) {
-            result.terms.erase(power);
-        }
-    }
-
-    return result;
 }
 
 polynomial polynomial::operator%(const polynomial &divisor) const {
