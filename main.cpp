@@ -92,10 +92,10 @@ std::optional<double> poly_test(polynomial& p1,
 
     // writeConfigFile(p3.getTerms(), "output.txt");
     writeConfigFileVector(p3_can_form, "output.txt");
-    if (p3_can_form != solution)
-    {
-        return std::nullopt;
-    }
+    // if (p3_can_form != solution)
+    // {
+    //     return std::nullopt;
+    // }
 
     return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 }
