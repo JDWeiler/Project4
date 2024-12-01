@@ -139,87 +139,91 @@ polynomial operator+(int scalar, const polynomial &poly) {
 //     return result;
 // }
 
-polynomial polynomial::operator*(const polynomial &other) const {
-    std::mutex mx; 
-    polynomial result;
-    vector<thread> threads;
-
-    //one thread per term of *this poly
-    //each thread multiplies the one term with the entire other poly
-    for(const auto & term : terms) {
-        threads.emplace_back([term, &other, &mx, &result]() {
-            polynomial localPoly;
-
-            for(const auto & otherTerm : other.terms) {
-                power newPower = term.first + otherTerm.first;
-                coeff newCoeff = term.second * otherTerm.second;
-                localPoly.terms[newPower] += newCoeff;     
-            }
-
-            //update result
-            mx.lock();
-            for(const auto & term : localPoly.terms) {
-                result.terms[term.first] += term.second;
-            }
-            mx.unlock();
-        });
-    }
-
-    //wait for all threads to finish
-    for(auto & thread : threads) {
-        thread.join();
-    }
-
-    result.simplify();
-    return (result);
-}
-
-// poly * poly with threads
+//this is all correct but its slow
 // polynomial polynomial::operator*(const polynomial &other) const {
+//     std::mutex mx; 
 //     polynomial result;
-//     std::mutex mx;
-
-//     size_t num_threads = std::thread::hardware_concurrency();
-//     if (num_threads == 0) {
-//         num_threads = 4;
-//     }
-
-//     auto multiply_chunk = [&](auto start, auto end) { //lambdaaaa
-//         polynomial local;
-//         for (auto it = start; it != end; ++it) {
-//             for (const auto &num : other.terms) {
-//                 power pow = it->first + num.first;
-//                 coeff cf = it->second * num.second;
-//                 local.terms[pow] += cf;
-//             }
-//         }
-//         mx.lock();
-//         for (const auto &[power, coeff] : local.terms) {
-//             result.terms[power] += coeff;
-//         }
-//         mx.unlock();
-//     };
-
-//     auto it = terms.begin();
-//     size_t total_terms = terms.size();
-//     size_t chunk_size = (total_terms + num_threads - 1) / num_threads;
-
 //     vector<thread> threads;
-//     for (size_t i = 0; i < num_threads && it != terms.end(); ++i) {
-//         auto start = it;
-//         advance(it, chunk_size);
-//         threads.emplace_back(multiply_chunk, start, it);
+
+//     //one thread per term of *this poly
+//     //each thread multiplies the one term with the entire other poly
+//     for(const auto & term : terms) {
+//         threads.emplace_back([term, &other, &mx, &result]() {
+//             polynomial localPoly;
+
+//             for(const auto & otherTerm : other.terms) {
+//                 power newPower = term.first + otherTerm.first;
+//                 coeff newCoeff = term.second * otherTerm.second;
+//                 localPoly.terms[newPower] += newCoeff;     
+//             }
+
+//             //update result
+//             mx.lock();
+//             for(const auto & term : localPoly.terms) {
+//                 result.terms[term.first] += term.second;
+//             }
+//             mx.unlock();
+//         });
 //     }
 
-//     for (auto &t : threads) {
-//         if (t.joinable()) {
-//             t.join();
-//         }
+//     //wait for all threads to finish
+//     for(auto & thread : threads) {
+//         thread.join();
 //     }
 
 //     result.simplify();
-//     return result;
+//     return (result);
 // }
+
+// poly * poly with threads
+// so this is super fast but for some reason the very last term is always wrong but the rest are all correct
+polynomial polynomial::operator*(const polynomial &other) const {
+    polynomial result;
+    std::mutex mx;
+
+    size_t num_threads = std::thread::hardware_concurrency();
+    if (num_threads == 0) {
+        num_threads = 4;
+    }
+
+    auto multiply_chunk = [&](auto start, auto end) { //lambdaaaa
+        std::map<power, coeff> local;
+
+        for (auto it = start; it != end; ++it) {
+            for (const auto &num : other.terms) {
+                power pow = it->first + num.first;
+                coeff cf = it->second * num.second;
+                local[pow] += cf;
+            }
+        }
+        
+        mx.lock();
+        for (const auto &[power, coeff] : local) {
+            result.terms[power] += coeff;
+        }
+        mx.unlock();
+    };
+
+    auto it = terms.begin();
+    size_t total_terms = terms.size();
+    size_t chunk_size = (total_terms + num_threads - 1) / num_threads;
+
+    vector<thread> threads;
+    for (size_t i = 0; i < num_threads && it != terms.end(); ++i) {
+        auto start = it;
+        advance(it, chunk_size);
+        threads.emplace_back(multiply_chunk, start, it);
+    }
+
+    for (auto &t : threads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+
+    result.simplify();
+    return result;
+}
 
 //poly * scalar no threads
 // polynomial polynomial::operator*(int scalar) const {
@@ -353,6 +357,7 @@ size_t polynomial::find_degree_of() const {
 std::vector<std::pair<power, coeff>> polynomial::canonical_form() const {
     std::vector<std::pair<power, coeff>> result;
     for (auto it = terms.rbegin(); it != terms.rend(); ++it) {
+    // for (auto it = terms.rend(); it != terms.rbegin(); --it) {
         if (it -> second != 0) {
             result.emplace_back( it -> first, it -> second); //emplace is like push back but like constrcuts it in place 
         }
@@ -368,74 +373,74 @@ bool comparePoly(std::pair<power, coeff> pair1, std::pair<power, coeff> pair2) {
     return(pair1.first < pair2.first);
 }
 
-// void polynomial::simplify() {
-//     for (auto it = terms.begin(); it != terms.end();) {
-//         if (it->second == 0) {
-//             it = terms.erase(it); 
-//         } else {
-//             ++it;
-//         }
-//     }
-//     if (terms.empty()) {
-//         terms[0] = 0; 
-//     }
-// }
-
 void polynomial::simplify() {
-    size_t num_terms = terms.size();
-    if (num_terms <= 100) { // Single-threaded small polynomials
-        for (auto it = terms.begin(); it != terms.end();) { // same thing as other one we made earlier
-            if (it->second == 0) {
-                it = terms.erase(it);
-            } else {
-                ++it;
-            }
-        }
-    } else { // Multithreaded  large polynomials
-        size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), num_terms);
-        if (num_threads == 0) num_threads = 1; //need at least 1 thread
-
-        size_t chunk_size = (num_terms + num_threads - 1) / num_threads; // divides into even chunks//rounds up so nun left out 
-        
-        
-        std::vector<std::map<power, coeff>> local_results(num_threads); //stores thread results
-        std::vector<std::thread> threads; // stores threads
-
-        auto it = terms.begin();
-        for (size_t i = 0; i < num_threads; ++i) {
-            auto start = it;
-            for (size_t j = 0; j < chunk_size && it != terms.end(); ++j) {
-                ++it;
-            }
-            auto end = it;  //finds end of chunk for thread
-
-            threads.emplace_back([&, i, start, end]() { // new thread and process chunk
-                for (auto it = start; it != end; ++it) { // lambda iterates over uhnk if coeff not 0 stores in local results
-                    if (it->second != 0) {
-                        local_results[i][it->first] = it->second;
-                    }
-                }
-            });
-        }
-
-        for (auto &t : threads) {
-            if (t.joinable()) {
-                t.join();
-            }
-        }
-
-        terms.clear();
-        for (const auto &local_result : local_results) {
-            for (const auto &[power, coeff] : local_result) {
-                terms[power] = coeff;
-            }
-        }
-
-        if (terms.empty()) {
-            terms[0] = 0;
+    for (auto it = terms.begin(); it != terms.end();) {
+        if (it->second == 0) {
+            it = terms.erase(it); 
+        } else {
+            ++it;
         }
     }
+    if (terms.empty()) {
+        terms[0] = 0; 
+    }
 }
+
+// void polynomial::simplify() {
+//     size_t num_terms = terms.size();
+//     if (num_terms <= 100) { // Single-threaded small polynomials
+//         for (auto it = terms.begin(); it != terms.end();) { // same thing as other one we made earlier
+//             if (it->second == 0) {
+//                 it = terms.erase(it);
+//             } else {
+//                 ++it;
+//             }
+//         }
+//     } else { // Multithreaded  large polynomials
+//         size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), num_terms);
+//         if (num_threads == 0) num_threads = 1; //need at least 1 thread
+
+//         size_t chunk_size = (num_terms + num_threads - 1) / num_threads; // divides into even chunks//rounds up so nun left out 
+        
+        
+//         std::vector<std::map<power, coeff>> local_results(num_threads); //stores thread results
+//         std::vector<std::thread> threads; // stores threads
+
+//         auto it = terms.begin();
+//         for (size_t i = 0; i < num_threads; ++i) {
+//             auto start = it;
+//             for (size_t j = 0; j < chunk_size && it != terms.end(); ++j) {
+//                 ++it;
+//             }
+//             auto end = it;  //finds end of chunk for thread
+
+//             threads.emplace_back([&, i, start, end]() { // new thread and process chunk
+//                 for (auto it = start; it != end; ++it) { // lambda iterates over uhnk if coeff not 0 stores in local results
+//                     if (it->second != 0) {
+//                         local_results[i][it->first] = it->second;
+//                     }
+//                 }
+//             });
+//         }
+
+//         for (auto &t : threads) {
+//             if (t.joinable()) {
+//                 t.join();
+//             }
+//         }
+
+//         terms.clear();
+//         for (const auto &local_result : local_results) {
+//             for (const auto &[power, coeff] : local_result) {
+//                 terms[power] = coeff;
+//             }
+//         }
+
+//         if (terms.empty()) {
+//             terms[0] = 0;
+//         }
+//     }
+// }
 
 polynomial polynomial::operator-(const polynomial &other) const {
     polynomial result = *this; 
