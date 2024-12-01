@@ -13,7 +13,7 @@ class polynomial
 {
 private:
     // power, coeff
-    std::map<int, int> terms;
+    std::map<power, coeff> terms;
 
 public:
     /**
