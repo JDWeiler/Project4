@@ -2,6 +2,7 @@
 #include <mutex>
 #include <vector>
 #include "poly.h"
+#include <iostream>
 
 using namespace std;
 
@@ -104,7 +105,6 @@ polynomial operator+(int scalar, const polynomial &poly) {
 //     return result;
 // }
 
-//first thoughts 
 //poly * poly using threads
 // polynomial polynomial::operator*(const polynomial &other) const {
 //     polynomial result;
@@ -174,7 +174,7 @@ polynomial polynomial::operator*(const polynomial &other) const {
     return (result);
 }
 
-//poly * poly with threads
+// poly * poly with threads
 // polynomial polynomial::operator*(const polynomial &other) const {
 //     polynomial result;
 //     std::mutex mx;
@@ -352,7 +352,7 @@ size_t polynomial::find_degree_of() const {
 
 std::vector<std::pair<power, coeff>> polynomial::canonical_form() const {
     std::vector<std::pair<power, coeff>> result;
-    for (auto it = terms.rbegin(); it != terms.rend(); ++it) {
+    for (auto it = terms.rend(); it != terms.rbegin(); --it) {
         if (it -> second != 0) {
             result.emplace_back( it -> first, it -> second); //emplace is like push back but like constrcuts it in place 
         }
@@ -474,4 +474,10 @@ polynomial polynomial::operator%(const polynomial &divisor) const {
     }
 
     return remainder;
+}
+
+void polynomial::print() const {
+    for(const auto &term : terms) {
+        std::cout << "power : " << term.first << " || coeff : " << term.second << std::endl;
+    }
 }

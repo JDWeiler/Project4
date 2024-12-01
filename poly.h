@@ -13,7 +13,7 @@ class polynomial
 {
 private:
     // power, coeff
-    std::map<power, coeff> terms;
+    std::map<power, coeff > terms;
 
 public:
     /**
@@ -133,7 +133,10 @@ public:
      */
     std::vector<std::pair<power, coeff>> canonical_form() const;
     void simplify();
-    
+ 
+    const std::map<power, coeff>& getTerms() const {
+        return terms;
+    }
 };
 
 
