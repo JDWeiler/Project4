@@ -352,7 +352,7 @@ size_t polynomial::find_degree_of() const {
 
 std::vector<std::pair<power, coeff>> polynomial::canonical_form() const {
     std::vector<std::pair<power, coeff>> result;
-    for (auto it = terms.rend(); it != terms.rbegin(); --it) {
+    for (auto it = terms.rbegin(); it != terms.rend(); ++it) {
         if (it -> second != 0) {
             result.emplace_back( it -> first, it -> second); //emplace is like push back but like constrcuts it in place 
         }
