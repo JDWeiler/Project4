@@ -176,10 +176,12 @@ polynomial operator+(int scalar, const polynomial &poly) {
 //     return (result);
 // }
 
+static std::mutex mx;
+
 std::map<power, coeff> helper(std::map<power, coeff>::const_iterator start, std::map<power, coeff>::const_iterator end, const polynomial &other) {
     std::map<power, coeff> output;
 
-            std::cout << "bruh again" << std::endl; 
+    // std::cout << "bruh again" << std::endl; 
     for(auto it = start; it != end; ++it) {
         for(const auto &term : other.terms) {
             power newPower = it -> first + term.first;
@@ -194,10 +196,11 @@ std::map<power, coeff> helper(std::map<power, coeff>::const_iterator start, std:
 //jordans v2 fr
 polynomial polynomial::operator*(const polynomial &other) const {
     polynomial result; 
-    int num_of_threads = 16;
+    int num_of_threads = 8;
     int size = terms.size();
     int chunkSize = size / num_of_threads;
     auto it = terms.begin();
+    std::mutex mx;
     std::vector<std::thread> threads;
     std::vector<map<power, coeff>> partials(num_of_threads);
 
@@ -206,8 +209,14 @@ polynomial polynomial::operator*(const polynomial &other) const {
         std::advance(it, chunkSize); //move it forward by chunksize
         auto end = (i != num_of_threads) ? it : terms.end(); //during the last chunk we dont want it...just want until the end
 
-        threads.emplace_back([&partials, i, start, end, &other] () {
+        threads.emplace_back([&partials, i, start, end, &other, &result, &mx] () {
             partials[i - 1] = helper(start, end, other);
+            //merge the partials
+            mx.lock();
+            for(const auto & term : partials[i - 1]) {
+                result.terms[term.first] += term.second;
+            }
+            mx.unlock();
         });
     }
 
@@ -217,11 +226,11 @@ polynomial polynomial::operator*(const polynomial &other) const {
     }
 
     //merge all partials into terms
-    for(const auto &part : partials) {
-        for(const auto & term : part) {
-            result.terms[term.first] += term.second;
-        }
-    }
+    // for(const auto &part : partials) {
+    //     for(const auto & term : part) {
+    //         result.terms[term.first] += term.second;
+    //     }
+    // }
 
     result.simplify();
     return result; 
