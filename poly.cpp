@@ -140,6 +140,7 @@ polynomial operator+(int scalar, const polynomial &poly) {
 // }
 
 //this is all correct but its slow
+//jordans slow version fr
 // polynomial polynomial::operator*(const polynomial &other) const {
 //     std::mutex mx; 
 //     polynomial result;
@@ -175,55 +176,107 @@ polynomial operator+(int scalar, const polynomial &poly) {
 //     return (result);
 // }
 
-// poly * poly with threads
-// so this is super fast but for some reason the very last term is always wrong but the rest are all correct
+std::map<power, coeff> helper(std::map<power, coeff>::const_iterator start, std::map<power, coeff>::const_iterator end, const polynomial &other) {
+    std::map<power, coeff> output;
+
+            std::cout << "bruh again" << std::endl; 
+    for(auto it = start; it != end; ++it) {
+        for(const auto &term : other.terms) {
+            power newPower = it -> first + term.first;
+            coeff newCoeff = it -> second * term.second;
+            output[newPower] += newCoeff;
+        }
+    }
+
+    return output; 
+}
+
+//jordans v2 fr
 polynomial polynomial::operator*(const polynomial &other) const {
-    polynomial result;
-    std::mutex mx;
-
-    size_t num_threads = std::thread::hardware_concurrency();
-    if (num_threads == 0) {
-        num_threads = 4;
-    }
-
-    auto multiply_chunk = [&](auto start, auto end) { //lambdaaaa
-        std::map<power, coeff> local;
-
-        for (auto it = start; it != end; ++it) {
-            for (const auto &num : other.terms) {
-                power pow = it->first + num.first;
-                coeff cf = it->second * num.second;
-                local[pow] += cf;
-            }
-        }
-        
-        mx.lock();
-        for (const auto &[power, coeff] : local) {
-            result.terms[power] += coeff;
-        }
-        mx.unlock();
-    };
-
+    polynomial result; 
+    int num_of_threads = 16;
+    int size = terms.size();
+    int chunkSize = size / num_of_threads;
     auto it = terms.begin();
-    size_t total_terms = terms.size();
-    size_t chunk_size = (total_terms + num_threads - 1) / num_threads;
+    std::vector<std::thread> threads;
+    std::vector<map<power, coeff>> partials(num_of_threads);
 
-    vector<thread> threads;
-    for (size_t i = 0; i < num_threads && it != terms.end(); ++i) {
+    for(int i = 1; i <= num_of_threads; i++) {
         auto start = it;
-        advance(it, chunk_size);
-        threads.emplace_back(multiply_chunk, start, it);
+        std::advance(it, chunkSize); //move it forward by chunksize
+        auto end = (i != num_of_threads) ? it : terms.end(); //during the last chunk we dont want it...just want until the end
+
+        threads.emplace_back([&partials, i, start, end, &other] () {
+            partials[i - 1] = helper(start, end, other);
+        });
     }
 
-    for (auto &t : threads) {
-        if (t.joinable()) {
-            t.join();
+    //wait for all threads to finish
+    for(auto & thread : threads) {
+        thread.join();
+    }
+
+    //merge all partials into terms
+    for(const auto &part : partials) {
+        for(const auto & term : part) {
+            result.terms[term.first] += term.second;
         }
     }
 
     result.simplify();
-    return result;
+    return result; 
 }
+
+// poly * poly with threads
+// so this is super fast but for some reason the very last term is always wrong but the rest are all correct
+// polynomial polynomial::operator*(const polynomial &other) const {
+//     polynomial result;
+//     std::mutex mx;
+
+//     size_t num_threads = std::thread::hardware_concurrency();
+//     if (num_threads == 0) {
+//         num_threads = 4;
+//     }
+    
+//     auto multiply_chunk = [&](auto start, auto end) { //lambdaaaa
+//         std::map<power, coeff> local;
+
+//     std::cout << "bruh but twice" << std::endl;
+//         for (auto it = start; it != end; ++it) {
+//             for (const auto &num : other.terms) {
+//                 power pow = it->first + num.first;
+//                 coeff cf = it->second * num.second;
+//                 local[pow] += cf;
+//             }
+//         }
+        
+//         mx.lock();
+//         for (const auto &[power, coeff] : local) {
+//             result.terms[power] += coeff;
+//         }
+//         mx.unlock();
+//     };
+
+//     auto it = terms.begin();
+//     size_t total_terms = terms.size();
+//     size_t chunk_size = (total_terms + num_threads - 1) / num_threads;
+
+//     vector<thread> threads;
+//     for (size_t i = 0; i < num_threads && it != terms.end(); ++i) {
+//         auto start = it;
+//         advance(it, chunk_size);
+//         threads.emplace_back(multiply_chunk, start, it);
+//     }
+
+//     for (auto &t : threads) {
+//         if (t.joinable()) {
+//             t.join();
+//         }
+//     }
+
+//     result.simplify();
+//     return result;
+// }
 
 //poly * scalar no threads
 // polynomial polynomial::operator*(int scalar) const {

@@ -8,8 +8,6 @@
 #include <sstream>
 #include "poly.h"
 
-
-
 //from chat
 std::vector<std::pair<power, coeff>> parseConfigFile(const std::string& filename) {
     std::vector<std::pair<power, coeff>> terms;
@@ -82,6 +80,7 @@ std::optional<double> poly_test(polynomial& p1,
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
     polynomial p3 = p1 * p2;
+    std::cout << "bruh" << std::endl;
 
     auto p3_can_form = p3.canonical_form();
 

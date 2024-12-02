@@ -11,7 +11,7 @@ using coeff = int;
 
 class polynomial
 {
-private:
+public:
     // power, coeff
     std::map<power, coeff > terms;
 
@@ -137,6 +137,7 @@ public:
     const std::map<power, coeff>& getTerms() const {
         return terms;
     }
+    // std::map<power, coeff> helper(std::map<power, coeff>::iterator start, std::map<power, coeff>::iterator end, const polynomial &other, int i);
 };
 
 
