@@ -1,9 +1,8 @@
 #include <iostream>
 #include <chrono>
-#include <optional>
+// #include <optional>
 #include <string>
 #include <utility> // for std::pair
-#include <vector>
 #include <fstream>
 #include <sstream>
 #include "poly.h"

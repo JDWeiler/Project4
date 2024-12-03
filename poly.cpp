@@ -3,6 +3,7 @@
 #include <vector>
 #include "poly.h"
 #include <iostream>
+#include <unordered_map>
 
 using namespace std;
 
@@ -178,8 +179,8 @@ polynomial operator+(int scalar, const polynomial &poly) {
 
 static std::mutex mx;
 
-std::map<power, coeff> helper(std::map<power, coeff>::const_iterator start, std::map<power, coeff>::const_iterator end, const polynomial &other) {
-    std::map<power, coeff> output;
+std::unordered_map<power, coeff> helper(std::map<power, coeff>::const_iterator start, std::map<power, coeff>::const_iterator end, const polynomial &other) {
+    std::unordered_map<power, coeff> output;
 
     // std::cout << "bruh again" << std::endl; 
     for(auto it = start; it != end; ++it) {
@@ -202,7 +203,7 @@ polynomial polynomial::operator*(const polynomial &other) const {
     auto it = terms.begin();
     std::mutex mx;
     std::vector<std::thread> threads;
-    std::vector<map<power, coeff>> partials(num_of_threads);
+    std::vector<unordered_map<power, coeff>> partials(num_of_threads);
 
     for(int i = 1; i <= num_of_threads; i++) {
         auto start = it;
