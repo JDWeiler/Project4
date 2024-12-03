@@ -226,13 +226,6 @@ polynomial polynomial::operator*(const polynomial &other) const {
         thread.join();
     }
 
-    //merge all partials into terms
-    // for(const auto &part : partials) {
-    //     for(const auto & term : part) {
-    //         result.terms[term.first] += term.second;
-    //     }
-    // }
-
     result.simplify();
     return result; 
 }
